@@ -1,0 +1,16 @@
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 240px;
+  margin: 0 auto;
+  text-align: center;
+
+  button {
+    margin-top: 24px;
+  }
+}
+
+.link {
+  margin-bottom: 96px;
+}

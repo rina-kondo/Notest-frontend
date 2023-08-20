@@ -1,0 +1,49 @@
+@mixin heading1 {
+  font-family: var(--font-sans-serif);
+  font-size: 32px;
+  font-weight: bold;
+}
+
+@mixin sub-heading1 {
+  font-family: var(--font-sans-serif);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+@mixin sub-heading2 {
+  font-family: var(--font-sans-serif);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+@mixin sub-heading3 {
+  font-family: var(--font-sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@mixin sub-heading4 {
+  font-family: var(--font-sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@mixin paragraph1 {
+  font-family: var(--font-sans-serif);
+  font-size: 20px;
+}
+
+@mixin paragraph2 {
+  font-family: var(--font-sans-serif);
+  font-size: 18px;
+}
+
+@mixin paragraph3 {
+  font-family: var(--font-sans-serif);
+  font-size: 16px;
+}
+
+@mixin paragraph4 {
+  font-family: var(--font-sans-serif);
+  font-size: 14px;
+}
