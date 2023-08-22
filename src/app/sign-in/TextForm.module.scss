@@ -14,6 +14,16 @@
   }
 }
 
+.flash {
+  position: relative;
+  transform: translateY(-24px);
+
+  &Text {
+    color: red;
+    text-align: start;
+  }
+}
+
 .input {
   width: 100vw;
   max-width: 100%;

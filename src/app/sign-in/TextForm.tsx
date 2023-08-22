@@ -12,7 +12,11 @@ type LoginForm = {
   password: string;
 };
 
-type Validation = LoginForm & { loginFailed: string };
+type Validation = {
+  email?: string;
+  password?: string;
+  loginFail?: string;
+};
 
 export function LoginForm() {
   const [loginForm, setLoginForm] = useState<LoginForm>({
@@ -20,11 +24,7 @@ export function LoginForm() {
     password: "",
   });
 
-  const [Validation, setValidation] = useState<Validation>({
-    email: "",
-    password: "",
-    loginFailed: "",
-  });
+  const [validation, setValidation] = useState<Validation>({});
 
   const updateLoginForm = (e: ChangeEvent<HTMLInputElement>) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
@@ -33,15 +33,29 @@ export function LoginForm() {
   const router = useRouter();
 
   const login = () => {
+    setValidation({});
+
     axiosApi.get("/sanctum/csrf-cookie").then((res) => {
       axiosApi
         .post("/login", loginForm)
-        .then((res: AxiosResponse) => {
-          console.log(res.data);
+        .then((response: AxiosResponse) => {
+          console.log(response.data);
           router.push("/");
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
+          if (err.response?.status === 422) {
+            const errors = (err.response?.data as any).errors;
+            const validationMessages: { [index: string]: string } =
+              {} as Validation;
+            Object.keys(errors).map((key: string) => {
+              validationMessages[key] = errors[key][0];
+            });
+            setValidation(validationMessages);
+          }
+          if (err.response?.status === 500) {
+            alert("システムエラーです");
+          }
         });
     });
   };
@@ -58,6 +72,11 @@ export function LoginForm() {
           onChange={updateLoginForm}
         />
       </label>
+      <div className={styles.flash}>
+        {validation.email && (
+          <p className={styles.flashText}>{validation.email}</p>
+        )}
+      </div>
       <label className={styles.label}>
         <input
           className={styles.input}
@@ -68,7 +87,17 @@ export function LoginForm() {
           onChange={updateLoginForm}
         />
       </label>
+      <div className={styles.flash}>
+        {validation.password && (
+          <p className={styles.flashText}>{validation.password}</p>
+        )}
+      </div>
       <Button text="サインイン" color="black" onClick={login} />
+      <div className={styles.flash}>
+        {validation.loginFail && (
+          <p className={styles.flashText}>{validation.loginFail}</p>
+        )}
+      </div>
     </>
   );
 }

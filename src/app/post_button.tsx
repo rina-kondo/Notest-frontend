@@ -20,16 +20,17 @@ type NoteForm = {
   is_saved: boolean;
 };
 
+type Validation = {
+  body?: string;
+};
+
 export default function PostButton() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [noteForm, setNoteForm] = useState<NoteForm>({
     body: "",
     is_saved: false,
   });
-  // const [validation, setValidation] = useState<NoteForm>({
-  //   body: "",
-  //   is_saved: false,
-  // });
+  const [validation, setValidation] = useState<Validation>({});
 
   const handleTextboxChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -44,6 +45,8 @@ export default function PostButton() {
   };
 
   const createMemo = () => {
+    setValidation({});
+
     axiosApi.get("/sanctum/csrf-cookie").then((res) => {
       axiosApi
         .post("/api/notes", noteForm)
@@ -52,6 +55,19 @@ export default function PostButton() {
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
+          if (err.response?.status === 422) {
+            const errors = (err.response?.data as any).errors;
+            const validationMessages: { [index: string]: string } =
+              {} as Validation;
+            Object.keys(errors).map((key: string) => {
+              validationMessages[key] = errors[key][0];
+            });
+            console.log(validationMessages);
+            setValidation(validationMessages);
+          }
+          if (err.response?.status === 500) {
+            alert("システムエラーです");
+          }
         });
     });
   };
@@ -80,6 +96,7 @@ export default function PostButton() {
                   value={noteForm.body}
                   onChange={handleTextboxChange}
                 />
+                {validation.body && <p className="">{validation.body}</p>}
                 <div className="flex py-2 px-1 justify-between">
                   <Checkbox
                     classNames={{
@@ -106,7 +123,7 @@ export default function PostButton() {
                   color="primary"
                   variant="ghost"
                   radius="sm"
-                  onPress={onClose}
+                  endContent={validation.body}
                   onClick={createMemo}
                 >
                   Add

@@ -8,20 +8,7 @@ export const metadata: Metadata = {
   title: "サインイン | Notest",
 };
 
-// type Validation = LoginForm & { loginFailed: string };
-
 const Page: NextPage = () => {
-  // const [validation, setValidation] = useState<Validation>({
-  //   email: "",
-  //   password: "",
-  //   loginFailed: "",
-  // });
-
-  const handleInputChange = (name: string, value: string) => {
-    // ここでnameとvalueを使用して何かを行う
-    // 例えば、APIを呼び出してログインを試みるなど
-  };
-
   return (
     <div className={styles.authForm}>
       <Logo size="large" />
