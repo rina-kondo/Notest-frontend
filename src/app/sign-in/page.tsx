@@ -13,7 +13,6 @@ const Page: NextPage = () => {
     <div className={styles.authForm}>
       <Logo size="large" />
       <LoginForm />
-
       <Link className={styles.link} href="/sign-up">
         アカウント登録はこちらから
       </Link>

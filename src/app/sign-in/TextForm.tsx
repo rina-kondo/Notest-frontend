@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, ChangeEvent } from "react";
 import { AxiosError, AxiosResponse } from "axios";
 import { axiosApi } from "../../lib/axios";
+import { useUserState } from "../../atoms/userAtom";
 import styles from "./TextForm.module.scss";
 import Button from "@components/common/Button";
 
@@ -19,18 +20,17 @@ type Validation = {
 };
 
 export function LoginForm() {
+  const router = useRouter();
   const [loginForm, setLoginForm] = useState<LoginForm>({
     email: "",
     password: "",
   });
-
   const [validation, setValidation] = useState<Validation>({});
+  const { setUser } = useUserState();
 
   const updateLoginForm = (e: ChangeEvent<HTMLInputElement>) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
   };
-
-  const router = useRouter();
 
   const login = () => {
     setValidation({});
@@ -39,11 +39,10 @@ export function LoginForm() {
       axiosApi
         .post("/login", loginForm)
         .then((response: AxiosResponse) => {
-          console.log(response.data);
+          setUser(response.data.data);
           router.push("/");
         })
         .catch((err: AxiosError) => {
-          console.log(err.response);
           if (err.response?.status === 422) {
             const errors = (err.response?.data as any).errors;
             const validationMessages: { [index: string]: string } =

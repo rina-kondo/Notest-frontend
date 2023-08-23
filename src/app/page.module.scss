@@ -2,3 +2,29 @@
   width: 600px;
   margin: 0 auto;
 }
+
+.input {
+  width: 100%;
+  &:focus {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+}
+
+.headline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 10px;
+}
+
+.search {
+  max-width: 50%;
+}
+
+.icon {
+  font-size: 1.4em;
+}
