@@ -3,7 +3,7 @@
 
 import { AxiosError, AxiosResponse } from "axios";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect, useRef, ChangeEvent, useMemo } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/ja";
 import utc from "dayjs/plugin/utc";
@@ -19,9 +19,16 @@ import {
   TableRow,
   TableCell,
 } from "@nextui-org/table";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownSection,
+  DropdownItem,
+} from "@nextui-org/dropdown";
 import { Chip } from "@nextui-org/chip";
 import { Input, Textarea } from "@nextui-org/input";
-import { Checkbox } from "@nextui-org/checkbox";
+import { Checkbox, CheckboxGroup } from "@nextui-org/checkbox";
 import { useDisclosure } from "@nextui-org/react";
 import {
   Modal,
@@ -31,9 +38,10 @@ import {
   ModalFooter,
 } from "@nextui-org/modal";
 import { Tooltip } from "@nextui-org/tooltip";
-import { SearchIcon } from "@nextui-org/shared-icons";
+import { SearchIcon, ChevronDownIcon } from "@nextui-org/shared-icons";
 import { BiLockAlt, BiLockOpenAlt, BiTrash, BiCopy } from "react-icons/bi";
 import styles from "./page.module.scss";
+import { on } from "events";
 
 type NoteForm = {
   body: string;
@@ -73,6 +81,7 @@ type PostButtonProps = {
 
 export default function App() {
   const router = useRouter();
+  const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
   const [noteGroups, setNoteGroups] = useState<NoteGroup[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [editedNotes, setEditedNotes] = useState<{ [key: number]: string }>({});
@@ -112,6 +121,18 @@ export default function App() {
     };
     init();
   }, []);
+
+  function createMemoGroup() {
+    axiosApi
+      .post("/api/note-groups")
+      .then((response: AxiosResponse) => {
+        console.log(response.data);
+        fetchNoteGroups();
+      })
+      .catch((err: AxiosError) => {
+        console.log(err.response);
+      });
+  }
 
   function getSearch(searchText: string, noteGroup: NoteGroup) {
     if (searchText.trim() === "") {
@@ -259,108 +280,240 @@ export default function App() {
     debouncedHandleSearch(searchTextValue, noteGroup);
   };
 
+  // ステータスのフィルタリング(未実装)
+  // const [visibleColumns, setVisibleColumns] = useState(new Set(["active"]));
+
+  // visibleColumnsの状態が変わるたびに、noteGroupsを更新する
+  // useEffect(() => {
+  //   console.log(visibleColumns);
+  //   const filteredNoteGroups = noteGroups.map((noteGroup) => {
+  //     return {
+  //       ...noteGroup,
+  //       notes: noteGroup.notes.filter((note) => {
+  //         if (visibleColumns.has("active")) {
+  //           return note.is_saved === true;
+  //         }
+  //         if (visibleColumns.has("inactive")) {
+  //           return note.is_saved === false;
+  //         }
+  //         return true;
+  //       }),
+  //     };
+  //   });
+  //   setNoteGroups(filteredNoteGroups);
+  // }, [visibleColumns]);
+
+  const [deleteGroupId, setDeleteGroupId] = useState<number[]>([]);
+
+  const deleteNotes = () => {
+    console.log(deleteGroupId);
+    axiosApi.get("/sanctum/csrf-cookie").then((res) => {
+      axiosApi
+        .delete("/api/note-groups", {
+          data: { ids: deleteGroupId },
+        })
+        .then((response: AxiosResponse) => {
+          console.log(response.data);
+          setNoteGroups((prevNoteGroups) =>
+            prevNoteGroups.filter((noteGroup) => {
+              return !deleteGroupId.includes(noteGroup.id);
+            })
+          );
+          setDeleteGroupId([]);
+          onClose();
+        })
+        .catch((err: AxiosError) => {
+          console.log(err.response);
+          if (err.response?.status === 422) {
+            const errors = (err.response?.data as any).errors;
+          }
+          if (err.response?.status === 500) {
+            alert("システムエラーです");
+          }
+        });
+    });
+  };
+
   return (
     <>
-      {noteGroups.map((noteGroup: NoteGroup) => (
-        <div className={styles.memo} key={noteGroup.id}>
-          <div className={styles.headline}>
-            <Input
-              isClearable
-              className={styles.search}
-              placeholder="メモを検索"
-              startContent={<SearchIcon />}
-              value={searchText}
-              onChange={(e) =>
-                handleSearchTextChange(e.target.value, noteGroup)
-              }
-              onClear={() => {
-                setSearchText("");
-                handleSearchTextChange("", noteGroup);
-              }}
-            />
-            <PostButton
-              noteGroup={noteGroup}
-              setNotes={setNotes}
-              setNoteGroups={setNoteGroups}
-            />
-          </div>
-          <Table aria-label="Example static collection table">
-            <TableHeader>
-              <TableColumn>{noteGroup.title}</TableColumn>
-              <TableColumn width="160px">STATUS</TableColumn>
-              <TableColumn width="90px">ACTIONS</TableColumn>
-            </TableHeader>
-            <TableBody emptyContent={"メモはありません"}>
-              {noteGroup.notes.map((note: Note) => {
-                return (
-                  <TableRow key={note.id}>
-                    <TableCell>
-                      <input
-                        className={styles.input}
-                        value={
-                          editedNotes[note.id] !== undefined
-                            ? editedNotes[note.id]
-                            : note.body
-                        }
-                        onChange={(e) =>
-                          handleInputChange(note.id, e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        color={
-                          note.is_saved
-                            ? "success"
-                            : remainingDays(note) === "期限切れ"
-                            ? "default"
-                            : "warning"
-                        }
-                        variant="flat"
-                      >
-                        {note.is_saved ? "保存済み" : remainingDays(note)}
-                      </Chip>
-                    </TableCell>
-                    <TableCell>
-                      <div className="relative flex items-center gap-2">
-                        {note.is_saved ? (
-                          <Tooltip content="保存を解除" placement="top">
-                            <BiLockOpenAlt
-                              className={`text-warning cursor-pointer active:opacity-50 ${styles.icon}`}
-                              onClick={() => toggleSaveSetting(note.id)}
-                            />
-                          </Tooltip>
-                        ) : (
-                          <Tooltip content="保存する" placement="top">
-                            <span>
-                              <BiLockAlt
-                                className={`text-success  cursor-pointer active:opacity-50 ${styles.icon}`}
+      <Button
+        className={styles.memogroupButton}
+        size="md"
+        variant="bordered"
+        radius="sm"
+        color="primary"
+        onClick={() => createMemoGroup()}
+      >
+        メモグループを新規作成
+      </Button>
+      <Button
+        className={styles.memogroupButton}
+        size="md"
+        variant="bordered"
+        radius="sm"
+        color="danger"
+        onPress={onOpen}
+      >
+        メモグループの管理
+      </Button>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                メモグループの管理
+              </ModalHeader>
+              <ModalBody className="flex flex-col gap-4">
+                <CheckboxGroup
+                  label="Select delete memo groups"
+                  onValueChange={setDeleteGroupId}
+                >
+                  {noteGroups.map((noteGroup: NoteGroup) => (
+                    <Checkbox
+                      color="danger"
+                      key={noteGroup.id}
+                      value={noteGroup.id}
+                    >
+                      {noteGroup.title}
+                    </Checkbox>
+                  ))}
+                </CheckboxGroup>
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="light" onPress={deleteNotes}>
+                  チェックしたメモグループを削除
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+      <div className={styles.memoList}>
+        {noteGroups.map((noteGroup: NoteGroup) => (
+          <div className={styles.memo} key={noteGroup.id}>
+            <div className={styles.headline}>
+              <Input
+                isClearable
+                className={styles.search}
+                placeholder="メモを検索"
+                startContent={<SearchIcon />}
+                value={searchText}
+                onChange={(e) =>
+                  handleSearchTextChange(e.target.value, noteGroup)
+                }
+                onClear={() => {
+                  setSearchText("");
+                  handleSearchTextChange("", noteGroup);
+                }}
+              />
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button
+                    endContent={<ChevronDownIcon className="text-small" />}
+                    variant="flat"
+                    radius="sm"
+                  >
+                    Status
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  disallowEmptySelection
+                  aria-label="Selection hidden columns"
+                  closeOnSelect={false}
+                  selectionMode="multiple"
+                  //未実装のため選択できないようにする
+                  disabledKeys={["active", "inactive"]}
+                  // selectedKeys={visibleColumns}
+                  // onSelectionChange={setVisibleColumns}
+                >
+                  <DropdownItem key="active">保存済み/期限内</DropdownItem>
+                  <DropdownItem key="inactive">期限切れ</DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+              <PostButton
+                noteGroup={noteGroup}
+                setNotes={setNotes}
+                setNoteGroups={setNoteGroups}
+              />
+            </div>
+            <Table aria-label="Example static collection table">
+              <TableHeader>
+                <TableColumn>{noteGroup.title}</TableColumn>
+                <TableColumn width="160px">STATUS</TableColumn>
+                <TableColumn width="90px">ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody emptyContent={"メモはありません"}>
+                {noteGroup.notes.map((note: Note) => {
+                  return (
+                    <TableRow key={note.id}>
+                      <TableCell>
+                        <input
+                          className={styles.input}
+                          value={
+                            editedNotes[note.id] !== undefined
+                              ? editedNotes[note.id]
+                              : note.body
+                          }
+                          onChange={(e) =>
+                            handleInputChange(note.id, e.target.value)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          color={
+                            note.is_saved
+                              ? "success"
+                              : remainingDays(note) === "期限切れ"
+                              ? "default"
+                              : "warning"
+                          }
+                          variant="flat"
+                        >
+                          {note.is_saved ? "保存済み" : remainingDays(note)}
+                        </Chip>
+                      </TableCell>
+                      <TableCell>
+                        <div className="relative flex items-center gap-2">
+                          {note.is_saved ? (
+                            <Tooltip content="保存を解除" placement="top">
+                              <BiLockOpenAlt
+                                className={`text-warning cursor-pointer active:opacity-50 ${styles.icon}`}
                                 onClick={() => toggleSaveSetting(note.id)}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Tooltip content="保存する" placement="top">
+                              <span>
+                                <BiLockAlt
+                                  className={`text-success  cursor-pointer active:opacity-50 ${styles.icon}`}
+                                  onClick={() => toggleSaveSetting(note.id)}
+                                />
+                              </span>
+                            </Tooltip>
+                          )}
+                          <Tooltip
+                            color="danger"
+                            content="メモを削除"
+                            placement="top"
+                          >
+                            <span>
+                              <BiTrash
+                                className={`text-danger cursor-pointer active:opacity-50 ${styles.icon}`}
+                                onClick={() => deleteNote(note.id)}
                               />
                             </span>
                           </Tooltip>
-                        )}
-                        <Tooltip
-                          color="danger"
-                          content="メモを削除"
-                          placement="top"
-                        >
-                          <span>
-                            <BiTrash
-                              className={`text-danger cursor-pointer active:opacity-50 ${styles.icon}`}
-                              onClick={() => deleteNote(note.id)}
-                            />
-                          </span>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
@@ -370,15 +523,18 @@ const PostButton: React.FC<PostButtonProps> = ({
   setNoteGroups,
 }) => {
   const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
+
   type PostButtonProps = {
     setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
     noteGroup: NoteGroup;
   };
+
   const [noteForm, setNoteForm] = useState<NoteForm>({
     body: "",
     is_saved: false,
     note_group_id: noteGroup.id,
   });
+
   const [validation, setValidation] = useState<Validation>({});
 
   const handleTextboxChange = (
