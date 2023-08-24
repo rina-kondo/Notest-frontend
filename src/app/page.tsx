@@ -37,6 +37,7 @@ import styles from "./page.module.scss";
 
 type NoteForm = {
   body: string;
+  note_group_id?: number;
   is_saved: boolean;
 };
 
@@ -44,8 +45,19 @@ type Validation = {
   body?: string;
 };
 
+type NoteGroup = {
+  id: number;
+  user_id: number;
+  title: string;
+  save_duration: number;
+  notes: Note[];
+  updated_at: string;
+  created_at: string;
+};
+
 type Note = {
   id: number;
+  note_group_id: number;
   body: string;
   is_deleted: boolean;
   is_saved: boolean;
@@ -55,10 +67,13 @@ type Note = {
 
 type PostButtonProps = {
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+  setNoteGroups: React.Dispatch<React.SetStateAction<NoteGroup[]>>;
+  noteGroup: NoteGroup;
 };
 
 export default function App() {
   const router = useRouter();
+  const [noteGroups, setNoteGroups] = useState<NoteGroup[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [editedNotes, setEditedNotes] = useState<{ [key: number]: string }>({});
   const [searchText, setSearchText] = useState("");
@@ -79,38 +94,85 @@ export default function App() {
     init();
   }, []);
 
-  function getSearch(searchText: string) {
+  const fetchNoteGroups = async () => {
+    try {
+      const response = await axiosApi.get("/api/note-groups");
+      console.log("done");
+      console.log(response.data);
+      return response.data.data;
+    } catch (err) {
+      console.log(err.response);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const fetchedNoteGroups = await fetchNoteGroups();
+      setNoteGroups(fetchedNoteGroups);
+    };
+    init();
+  }, []);
+
+  function getSearch(searchText: string, noteGroup: NoteGroup) {
     if (searchText.trim() === "") {
+      console.log(noteGroup.id);
       axiosApi
-        .get("/api/notes")
+        .get(`/api/note-groups/${noteGroup.id}`)
         .then((response: AxiosResponse) => {
-          console.log(response.data);
-          setNotes(response.data.data);
+          const notes = response.data.data.notes;
+          setNoteGroups((prevNoteGroups) =>
+            prevNoteGroups.map((ng) => {
+              if (ng.id === noteGroup.id) {
+                return {
+                  ...ng,
+                  notes: notes,
+                };
+              }
+              return ng;
+            })
+          );
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
         });
     } else {
       axiosApi
-        .get(`/api/notes/search/${searchText}`)
+        .get(`/api/notes/search/${noteGroup.id}`, {
+          params: { query: searchText },
+        })
         .then((response: AxiosResponse) => {
-          console.log(response.data);
-          setNotes(response.data.data);
+          console.log("search done");
+          console.log(response.data.data);
+          setNoteGroups((prevNoteGroups) =>
+            prevNoteGroups.map((ng) => {
+              if (ng.id === noteGroup.id) {
+                return {
+                  ...ng,
+                  notes: response.data.data,
+                };
+              }
+              return ng;
+            })
+          );
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
         });
     }
   }
+
   function toggleSaveSetting(id: number) {
     axiosApi
       .put(`api/notes/save/${id}`, id)
       .then((response: AxiosResponse) => {
         console.log(response.data);
-        setNotes((prevNotes) =>
-          prevNotes.map((note) =>
-            note.id === id ? { ...note, is_saved: !note.is_saved } : note
-          )
+        setNoteGroups((prevNoteGroups) =>
+          prevNoteGroups.map((noteGroup) => ({
+            ...noteGroup,
+            notes: noteGroup.notes.map((note) =>
+              note.id === id ? { ...note, is_saved: !note.is_saved } : note
+            ),
+          }))
         );
       })
       .catch((err: AxiosError) => {
@@ -129,7 +191,12 @@ export default function App() {
       .delete(`api/notes/${id}`)
       .then((response: AxiosResponse) => {
         console.log(response.data);
-        setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id));
+        setNoteGroups((prevNoteGroups) =>
+          prevNoteGroups.map((noteGroup) => ({
+            ...noteGroup,
+            notes: noteGroup.notes.filter((note) => note.id !== id),
+          }))
+        );
       })
       .catch((err: AxiosError) => {
         console.log(err.response);
@@ -148,12 +215,14 @@ export default function App() {
       axiosApi
         .put(`/api/notes/${id}`, { body: updatedBody })
         .then((response: AxiosResponse) => {
-          console.log(response.data);
           const updatedNoteFromAPI = response.data.note;
-          setNotes((prevNotes) =>
-            prevNotes.map((note) =>
-              note.id === id ? updatedNoteFromAPI : note
-            )
+          setNoteGroups((prevNoteGroups) =>
+            prevNoteGroups.map((noteGroup) => ({
+              ...noteGroup,
+              notes: noteGroup.notes.map((note) =>
+                note.id === id ? updatedNoteFromAPI : note
+              ),
+            }))
           );
         })
         .catch((err: AxiosError) => {
@@ -180,104 +249,135 @@ export default function App() {
     }
   };
 
-  const handleSearchTextChange = (value: string) => {
-    setSearchText(value);
-    debouncedHandleSearch(value);
+  const handleSearchTextChange = (
+    value: string | null,
+    noteGroup: NoteGroup
+  ) => {
+    const searchTextValue = value || "";
+    console.log(searchTextValue);
+    setSearchText(searchTextValue);
+    debouncedHandleSearch(searchTextValue, noteGroup);
   };
 
   return (
-    <div className={styles.memo}>
-      <div className={styles.headline}>
-        <Input
-          isClearable
-          className={styles.search}
-          placeholder="メモを検索"
-          startContent={<SearchIcon />}
-          value={searchText}
-          onChange={(e) => handleSearchTextChange(e.target.value)}
-          onClear={() => {
-            setSearchText("");
-            handleSearchTextChange("");
-          }}
-        />
-        <PostButton setNotes={setNotes} />
-      </div>
-      <Table aria-label="Example static collection table">
-        <TableHeader>
-          <TableColumn>MEMO</TableColumn>
-          <TableColumn width="160px">STATUS</TableColumn>
-          <TableColumn width="90px">ACTIONS</TableColumn>
-        </TableHeader>
-        <TableBody emptyContent={"メモはありません"}>
-          {notes.map((note: Note) => {
-            return (
-              <TableRow key={note.id}>
-                <TableCell>
-                  <input
-                    className={styles.input}
-                    value={
-                      editedNotes[note.id] !== undefined
-                        ? editedNotes[note.id]
-                        : note.body
-                    }
-                    onChange={(e) => handleInputChange(note.id, e.target.value)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    color={note.is_saved ? "success" : "warning"}
-                    variant="flat"
-                  >
-                    {note.is_saved ? "保存済み" : remainingDays(note)}
-                  </Chip>
-                </TableCell>
-                <TableCell>
-                  <div className="relative flex items-center gap-2">
-                    {note.is_saved ? (
-                      <Tooltip content="保存を解除" placement="top">
-                        <BiLockOpenAlt
-                          className={`text-warning cursor-pointer active:opacity-50 ${styles.icon}`}
-                          onClick={() => toggleSaveSetting(note.id)}
-                        />
-                      </Tooltip>
-                    ) : (
-                      <Tooltip content="保存する" placement="top">
-                        <span>
-                          <BiLockAlt
-                            className={`text-success  cursor-pointer active:opacity-50 ${styles.icon}`}
-                            onClick={() => toggleSaveSetting(note.id)}
-                          />
-                        </span>
-                      </Tooltip>
-                    )}
-                    <Tooltip
-                      color="danger"
-                      content="メモを削除"
-                      placement="top"
-                    >
-                      <span>
-                        <BiTrash
-                          className={`text-danger cursor-pointer active:opacity-50 ${styles.icon}`}
-                          onClick={() => deleteNote(note.id)}
-                        />
-                      </span>
-                    </Tooltip>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+    <>
+      {noteGroups.map((noteGroup: NoteGroup) => (
+        <div className={styles.memo} key={noteGroup.id}>
+          <div className={styles.headline}>
+            <Input
+              isClearable
+              className={styles.search}
+              placeholder="メモを検索"
+              startContent={<SearchIcon />}
+              value={searchText}
+              onChange={(e) =>
+                handleSearchTextChange(e.target.value, noteGroup)
+              }
+              onClear={() => {
+                setSearchText("");
+                handleSearchTextChange("", noteGroup);
+              }}
+            />
+            <PostButton
+              noteGroup={noteGroup}
+              setNotes={setNotes}
+              setNoteGroups={setNoteGroups}
+            />
+          </div>
+          <Table aria-label="Example static collection table">
+            <TableHeader>
+              <TableColumn>{noteGroup.title}</TableColumn>
+              <TableColumn width="160px">STATUS</TableColumn>
+              <TableColumn width="90px">ACTIONS</TableColumn>
+            </TableHeader>
+            <TableBody emptyContent={"メモはありません"}>
+              {noteGroup.notes.map((note: Note) => {
+                return (
+                  <TableRow key={note.id}>
+                    <TableCell>
+                      <input
+                        className={styles.input}
+                        value={
+                          editedNotes[note.id] !== undefined
+                            ? editedNotes[note.id]
+                            : note.body
+                        }
+                        onChange={(e) =>
+                          handleInputChange(note.id, e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        color={
+                          note.is_saved
+                            ? "success"
+                            : remainingDays(note) === "期限切れ"
+                            ? "default"
+                            : "warning"
+                        }
+                        variant="flat"
+                      >
+                        {note.is_saved ? "保存済み" : remainingDays(note)}
+                      </Chip>
+                    </TableCell>
+                    <TableCell>
+                      <div className="relative flex items-center gap-2">
+                        {note.is_saved ? (
+                          <Tooltip content="保存を解除" placement="top">
+                            <BiLockOpenAlt
+                              className={`text-warning cursor-pointer active:opacity-50 ${styles.icon}`}
+                              onClick={() => toggleSaveSetting(note.id)}
+                            />
+                          </Tooltip>
+                        ) : (
+                          <Tooltip content="保存する" placement="top">
+                            <span>
+                              <BiLockAlt
+                                className={`text-success  cursor-pointer active:opacity-50 ${styles.icon}`}
+                                onClick={() => toggleSaveSetting(note.id)}
+                              />
+                            </span>
+                          </Tooltip>
+                        )}
+                        <Tooltip
+                          color="danger"
+                          content="メモを削除"
+                          placement="top"
+                        >
+                          <span>
+                            <BiTrash
+                              className={`text-danger cursor-pointer active:opacity-50 ${styles.icon}`}
+                              onClick={() => deleteNote(note.id)}
+                            />
+                          </span>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      ))}
+    </>
   );
 }
 
-const PostButton: React.FC<PostButtonProps> = ({ setNotes }) => {
+const PostButton: React.FC<PostButtonProps> = ({
+  noteGroup,
+  setNoteGroups,
+}) => {
   const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
+  type PostButtonProps = {
+    setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+    noteGroup: NoteGroup;
+  };
   const [noteForm, setNoteForm] = useState<NoteForm>({
     body: "",
     is_saved: false,
+    note_group_id: noteGroup.id,
   });
   const [validation, setValidation] = useState<Validation>({});
 
@@ -302,11 +402,20 @@ const PostButton: React.FC<PostButtonProps> = ({ setNotes }) => {
         .then((response: AxiosResponse) => {
           console.log(response.data);
           const newNote = response.data.note;
-          setNotes((prevNotes) => [...prevNotes, newNote]);
-          setNoteForm({
-            body: "",
-            is_saved: false,
-          });
+
+          setNoteGroups((prevNoteGroups) =>
+            prevNoteGroups.map((ng) => {
+              if (ng.id === noteGroup.id) {
+                return {
+                  ...ng,
+                  notes: [...ng.notes, newNote],
+                };
+              }
+              return ng;
+            })
+          );
+          noteForm.body = "";
+          noteForm.is_saved = false;
           onClose();
         })
         .catch((err: AxiosError) => {
