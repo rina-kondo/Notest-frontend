@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, ChangeEvent } from "react";
 import { AxiosError, AxiosResponse } from "axios";
-import { axiosApi } from "../../lib/axios";
-import { useUserState } from "../../atoms/userAtom";
+import { axiosApi } from "../../../lib/axios";
+import { useUserState } from "../../../atoms/userAtom";
 import styles from "./TextForm.module.scss";
 import Button from "@components/common/Button";
 

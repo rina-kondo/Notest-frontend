@@ -1,7 +1,31 @@
-import styles from './Header.module.scss';
-import Link from 'next/link';
+"use client";
+
+import styles from "./Header.module.scss";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AxiosError, AxiosResponse } from "axios";
+import { axiosApi } from "../../../lib/axios";
 
 export default function HeaderLayout() {
+  const router = useRouter();
+  const logout = () => {
+    axiosApi.get("/sanctum/csrf-cookie").then((res) => {
+      axiosApi
+        .post("api/logout")
+        .then((response: AxiosResponse) => {
+          router.push("/sign-in");
+        })
+        .catch((err: AxiosError) => {
+          if (err.response?.status === 422) {
+            const errors = (err.response?.data as any).errors;
+          }
+          if (err.response?.status === 500) {
+            alert("システムエラーです");
+          }
+        });
+    });
+  };
+
   return (
     <header className={styles.header}>
       <nav className={styles.nav}>
@@ -12,9 +36,9 @@ export default function HeaderLayout() {
             </Link>
           </li>
           <li>
-            <Link className={styles.link} href="/sign-up">
-              新規登録
-            </Link>
+            <button className={styles.link} onClick={logout}>
+              ログアウト
+            </button>
           </li>
           <li>
             <Link className={styles.link} href="/sign-in">

@@ -88,21 +88,6 @@ export default function App() {
   const [searchText, setSearchText] = useState("");
   const { checkLoggedIn } = useAuth();
 
-  // get notes
-  useEffect(() => {
-    const init = async () => {
-      const res: boolean = await checkLoggedIn();
-      axiosApi
-        .get("/api/notes")
-        .then((response: AxiosResponse) => {
-          console.log(response.data);
-          setNotes(response.data.data);
-        })
-        .catch((err: AxiosError) => console.log(err.response));
-    };
-    init();
-  }, []);
-
   const fetchNoteGroups = async () => {
     try {
       const response = await axiosApi.get("/api/note-groups");
@@ -134,47 +119,24 @@ export default function App() {
       });
   }
 
-  function getSearch(searchText: string, noteGroup: NoteGroup) {
+  function getSearch(searchText: string) {
     if (searchText.trim() === "") {
-      console.log(noteGroup.id);
       axiosApi
-        .get(`/api/note-groups/${noteGroup.id}`)
+        .get("/api/note-groups")
         .then((response: AxiosResponse) => {
-          const notes = response.data.data.notes;
-          setNoteGroups((prevNoteGroups) =>
-            prevNoteGroups.map((ng) => {
-              if (ng.id === noteGroup.id) {
-                return {
-                  ...ng,
-                  notes: notes,
-                };
-              }
-              return ng;
-            })
-          );
+          setNoteGroups(response.data.data);
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
         });
     } else {
       axiosApi
-        .get(`/api/notes/search/${noteGroup.id}`, {
+        .get(`/api/note-groups/search/${searchText}`, {
           params: { query: searchText },
         })
         .then((response: AxiosResponse) => {
-          console.log("search done");
-          console.log(response.data.data);
-          setNoteGroups((prevNoteGroups) =>
-            prevNoteGroups.map((ng) => {
-              if (ng.id === noteGroup.id) {
-                return {
-                  ...ng,
-                  notes: response.data.data,
-                };
-              }
-              return ng;
-            })
-          );
+          console.log(response.data);
+          setNoteGroups(response.data.data);
         })
         .catch((err: AxiosError) => {
           console.log(err.response);
@@ -365,14 +327,14 @@ export default function App() {
               </ModalHeader>
               <ModalBody className="flex flex-col gap-4">
                 <CheckboxGroup
-                  label="Select delete memo groups"
+                  label="削除するメモグループを選択してください"
                   onValueChange={setDeleteGroupId}
                 >
                   {noteGroups.map((noteGroup: NoteGroup) => (
                     <Checkbox
                       color="danger"
                       key={noteGroup.id}
-                      value={noteGroup.id}
+                      value={noteGroup.id.toString()}
                     >
                       {noteGroup.title}
                     </Checkbox>
@@ -388,24 +350,22 @@ export default function App() {
           )}
         </ModalContent>
       </Modal>
+      <Input
+        isClearable
+        className={styles.search}
+        placeholder="メモを検索"
+        startContent={<SearchIcon />}
+        value={searchText}
+        onChange={(e) => handleSearchTextChange(e.target.value, noteGroups)}
+        onClear={() => {
+          setSearchText("");
+          handleSearchTextChange("", noteGroup);
+        }}
+      />
       <div className={styles.memoList}>
         {noteGroups.map((noteGroup: NoteGroup) => (
           <div className={styles.memo} key={noteGroup.id}>
             <div className={styles.headline}>
-              <Input
-                isClearable
-                className={styles.search}
-                placeholder="メモを検索"
-                startContent={<SearchIcon />}
-                value={searchText}
-                onChange={(e) =>
-                  handleSearchTextChange(e.target.value, noteGroup)
-                }
-                onClear={() => {
-                  setSearchText("");
-                  handleSearchTextChange("", noteGroup);
-                }}
-              />
               <Dropdown>
                 <DropdownTrigger>
                   <Button
