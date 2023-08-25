@@ -359,7 +359,7 @@ export default function App() {
         onChange={(e) => handleSearchTextChange(e.target.value, noteGroups)}
         onClear={() => {
           setSearchText("");
-          handleSearchTextChange("", noteGroup);
+          handleSearchTextChange("");
         }}
       />
       <div className={styles.memoList}>
