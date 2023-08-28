@@ -41,7 +41,6 @@ import { Tooltip } from "@nextui-org/tooltip";
 import { SearchIcon, ChevronDownIcon } from "@nextui-org/shared-icons";
 import { BiLockAlt, BiLockOpenAlt, BiTrash, BiCopy } from "react-icons/bi";
 import styles from "./page.module.scss";
-import { on } from "events";
 
 type NoteForm = {
   body: string;
